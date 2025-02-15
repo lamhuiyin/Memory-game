@@ -1,34 +1,80 @@
+
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyASpIDZk1wFB_4ngFMR5v3J0y_nAL0G2Tw",
+  authDomain: "memory-game-e7044.firebaseapp.com",
+  databaseURL: "https://memory-game-e7044-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "memory-game-e7044",
+  storageBucket: "memory-game-e7044.firebasestorage.app",
+  messagingSenderId: "30560387508",
+  appId: "1:30560387508:web:549de3d6276e61f40b72e1",
+  measurementId: "G-EWRW6TZMHP"
+};
+
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+let gameRoomId;
+let playerId;
+
+// DOM Elements
 const boardElement = document.getElementById('board');
 const player1ScoreElement = document.getElementById('player1-score');
 const player2ScoreElement = document.getElementById('player2-score');
 const turnElement = document.getElementById('turn');
 const resetButton = document.getElementById('reset-button');
 
-let board = [];
-let flippedCards = [];
-let currentPlayer = 1;
-let playerScores = { 1: 0, 2: 0 };
-let lockBoard = false;
+// Start the game
+async function startGame() {
+    await auth.signInAnonymously();
+    playerId = auth.currentUser.uid;
 
-// Firebase Realtime Database reference
-const gameRef = firebase.ref(firebase.database, 'game');
+    const urlParams = new URLSearchParams(window.location.search);
+    gameRoomId = urlParams.get('gameRoomId');
 
-// Initialize the game
-function initGame() {
-    board = createBoard();
-    renderBoard();
-    playerScores = { 1: 0, 2: 0 };
-    currentPlayer = 1;
-    updateScores();
-    updateTurn();
+    if (gameRoomId) {
+        await joinGameRoom(gameRoomId);
+    } else {
+        gameRoomId = await createGameRoom();
+        window.history.pushState({}, '', `?gameRoomId=${gameRoomId}`);
+    }
 
-    // Sync game state with Firebase
-    firebase.set(gameRef, {
-        board: board,
-        flippedCards: flippedCards,
-        currentPlayer: currentPlayer,
-        playerScores: playerScores,
-        lockBoard: lockBoard
+    syncGameState(gameRoomId, (gameState) => {
+        renderBoard(gameState.board);
+        updateScores(gameState.playerScores);
+        updateTurn(gameState.currentPlayer);
+    });
+}
+
+// Create a new game room
+async function createGameRoom() {
+    const gameRoomRef = await db.collection('gameRooms').add({
+        player1: playerId,
+        player2: null,
+        board: createBoard(),
+        flippedCards: [],
+        currentPlayer: 1,
+        playerScores: { 1: 0, 2: 0 },
+        lockBoard: false
+    });
+    return gameRoomRef.id;
+}
+
+// Join an existing game room
+async function joinGameRoom(gameRoomId) {
+    await db.collection('gameRooms').doc(gameRoomId).update({
+        player2: playerId
+    });
+}
+
+// Sync game state in real-time
+function syncGameState(gameRoomId, callback) {
+    db.collection('gameRooms').doc(gameRoomId).onSnapshot((doc) => {
+        const gameState = doc.data();
+        callback(gameState);
     });
 }
 
@@ -40,7 +86,7 @@ function createBoard() {
 }
 
 // Render the board
-function renderBoard() {
+function renderBoard(board) {
     boardElement.innerHTML = '';
     board.forEach((card, index) => {
         const cardElement = document.createElement('div');
@@ -68,93 +114,86 @@ function renderBoard() {
 }
 
 // Flip a card
-function flipCard(index) {
-    if (lockBoard || board[index].flipped || board[index].matched || flippedCards.length === 2) return;
+async function flipCard(index) {
+    const gameRoomRef = db.collection('gameRooms').doc(gameRoomId);
+    const gameState = (await gameRoomRef.get()).data();
 
-    board[index].flipped = true;
-    flippedCards.push(index);
-    renderBoard();
+    if (gameState.lockBoard || gameState.board[index].flipped || gameState.board[index].matched || gameState.flippedCards.length === 2) return;
 
-    // Update Firebase
-    firebase.update(gameRef, {
-        board: board,
-        flippedCards: flippedCards
+    gameState.board[index].flipped = true;
+    gameState.flippedCards.push(index);
+
+    await gameRoomRef.update({
+        board: gameState.board,
+        flippedCards: gameState.flippedCards
     });
 
-    if (flippedCards.length === 2) {
-        checkForMatch();
+    if (gameState.flippedCards.length === 2) {
+        checkForMatch(gameRoomId, gameState);
     }
 }
 
 // Check for a match
-function checkForMatch() {
-    const [index1, index2] = flippedCards;
-    if (board[index1].symbol === board[index2].symbol) {
-        // Correct match
-        setTimeout(() => {
-            board[index1].matched = true;
-            board[index2].matched = true;
-            flippedCards = [];
-            renderBoard();
-            playerScores[currentPlayer]++;
-            updateScores();
-            if (playerScores[1] + playerScores[2] === 8) {
-                endGame();
-            }
+async function checkForMatch(gameRoomId, gameState) {
+    const [index1, index2] = gameState.flippedCards;
+    const gameRoomRef = db.collection('gameRooms').doc(gameRoomId);
 
-            // Update Firebase
-            firebase.update(gameRef, {
-                board: board,
-                flippedCards: flippedCards,
-                playerScores: playerScores
-            });
-        }, 1000); // Wait 1 second before hiding matched cards
+    if (gameState.board[index1].symbol === gameState.board[index2].symbol) {
+        // Correct match
+        gameState.board[index1].matched = true;
+        gameState.board[index2].matched = true;
+        gameState.playerScores[gameState.currentPlayer]++;
+        gameState.flippedCards = [];
+
+        await gameRoomRef.update({
+            board: gameState.board,
+            playerScores: gameState.playerScores,
+            flippedCards: gameState.flippedCards
+        });
+
+        if (gameState.playerScores[1] + gameState.playerScores[2] === 8) {
+            endGame(gameState);
+        }
     } else {
         // Incorrect match
-        lockBoard = true;
-        setTimeout(() => {
-            board[index1].flipped = false;
-            board[index2].flipped = false;
-            flippedCards = [];
-            renderBoard();
-            lockBoard = false;
-            switchPlayer();
+        gameState.lockBoard = true;
+        await gameRoomRef.update({ lockBoard: true });
 
-            // Update Firebase
-            firebase.update(gameRef, {
-                board: board,
-                flippedCards: flippedCards,
-                currentPlayer: currentPlayer,
-                lockBoard: lockBoard
+        setTimeout(async () => {
+            gameState.board[index1].flipped = false;
+            gameState.board[index2].flipped = false;
+            gameState.flippedCards = [];
+            gameState.lockBoard = false;
+            gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+
+            await gameRoomRef.update({
+                board: gameState.board,
+                flippedCards: gameState.flippedCards,
+                lockBoard: gameState.lockBoard,
+                currentPlayer: gameState.currentPlayer
             });
-        }, 1500); // Slow down flip for incorrect answers
+        }, 1500);
     }
 }
 
-// Switch players
-function switchPlayer() {
-    currentPlayer = currentPlayer === 1 ? 2 : 1;
-    updateTurn();
-}
-
 // Update scores
-function updateScores() {
+function updateScores(playerScores) {
     player1ScoreElement.textContent = playerScores[1];
     player2ScoreElement.textContent = playerScores[2];
 }
 
 // Update turn display
-function updateTurn() {
+function updateTurn(currentPlayer) {
     turnElement.textContent = `Player ${currentPlayer}'s Turn`;
     turnElement.className = `player${currentPlayer}-turn`;
 }
 
 // End the game
-function endGame() {
+function endGame(gameState) {
     let winner = '';
-    if (playerScores[1] > playerScores[2]) {
+    if (gameState.playerScores[1] > gameState.playerScores[2]) {
         winner = 'Player 1 wins!';
-    } else if (playerScores[2] > playerScores[1]) {
+    } else if (gameState.playerScores[2] > gameState.playerScores[1]) {
         winner = 'Player 2 wins!';
     } else {
         winner = 'It\'s a tie!';
@@ -163,22 +202,10 @@ function endGame() {
 }
 
 // Reset the game
-resetButton.addEventListener('click', initGame);
-
-// Listen for real-time updates from Firebase
-firebase.onValue(gameRef, (snapshot) => {
-    const data = snapshot.val();
-    if (data) {
-        board = data.board;
-        flippedCards = data.flippedCards;
-        currentPlayer = data.currentPlayer;
-        playerScores = data.playerScores;
-        lockBoard = data.lockBoard;
-        renderBoard();
-        updateScores();
-        updateTurn();
-    }
+resetButton.addEventListener('click', async () => {
+    await db.collection('gameRooms').doc(gameRoomId).delete();
+    window.location.reload();
 });
 
 // Start the game
-initGame(); 
+startGame();
