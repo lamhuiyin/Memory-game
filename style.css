@@ -1,0 +1,109 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+.container {
+    text-align: center;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    margin-bottom: 10px;
+}
+
+.board {
+    display: grid;
+    grid-template-columns: repeat(4, 100px);
+    grid-gap: 10px;
+    margin: 20px auto;
+    justify-content: center;
+}
+
+.card {
+    width: 100px;
+    height: 100px;
+    perspective: 1000px; /* Enable 3D perspective */
+    cursor: pointer;
+    position: relative;
+    transform-style: preserve-3d;
+}
+
+.card .front,
+.card .back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden; /* Hide the back face during flip */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 10px;
+    font-size: 24px;
+    color: white;
+    transition: transform 0.5s ease;
+}
+
+.card .front {
+    background-color: #2ecc71;
+    transform: rotateY(180deg); /* Front face starts flipped */
+}
+
+.card .back {
+    background-color: #3498db;
+    transform: rotateY(0deg); /* Back face is visible by default */
+}
+
+.card.flipped .back {
+    transform: rotateY(180deg); /* Flip the back face */
+}
+
+.card.flipped .front {
+    transform: rotateY(0deg); /* Show the front face */
+}
+
+.card.matched {
+    visibility: hidden;
+    opacity: 0;
+    transition: visibility 0s 0.5s, opacity 0.5s ease;
+}
+
+#score {
+    margin: 20px 0;
+}
+
+#turn {
+    font-size: 20px;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+#reset-button {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    border: none;
+    background-color: #e74c3c;
+    color: white;
+    border-radius: 5px;
+}
+
+#reset-button:hover {
+    background-color: #c0392b;
+}
+
+.player1-turn {
+    color: #3498db;
+}
+
+.player2-turn {
+    color: #e74c3c;
+}
