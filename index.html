@@ -3,12 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Memory Game - 2 Player Online</title>
+    <title>Memory Game - Online 2 Player</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js"></script>
+    <script src="script.js" defer></script>
 </head>
 <body>
     <div class="container">
-        <h1>Memory Matching Game</h1>
+        <h1>Memory Game - Online 2 Player</h1>
         <p>Find matching pairs of cards. The player with the most matches wins!</p>
         <div id="board" class="board"></div>
         <div id="score">
@@ -18,32 +22,5 @@
         <p id="turn">Player 1's Turn</p>
         <button id="reset-button">Reset Game</button>
     </div>
-
-    <!-- Firebase SDK -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-        import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyASpIDZk1wFB_4ngFMR5v3J0y_nAL0G2Tw",
-            authDomain: "memory-game-e7044.firebaseapp.com",
-            databaseURL: "https://memory-game-e7044-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "memory-game-e7044",
-            storageBucket: "memory-game-e7044.firebasestorage.app",
-            messagingSenderId: "30560387508",
-            appId: "1:30560387508:web:549de3d6276e61f40b72e1",
-            measurementId: "G-EWRW6TZMHP"
-        };
-
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
-
-        // Export Firebase functions for use in script.js
-        window.firebase = { database, ref, set, onValue, update };
-    </script>
-
-    <!-- Game Script -->
-    <script src="script.js"></script>
 </body>
-</html> 
+</html>
