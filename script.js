@@ -181,4 +181,4 @@ firebase.onValue(gameRef, (snapshot) => {
 });
 
 // Start the game
-initGame();
+initGame(); 
