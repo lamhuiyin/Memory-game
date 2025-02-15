@@ -10,6 +10,9 @@ let currentPlayer = 1;
 let playerScores = { 1: 0, 2: 0 };
 let lockBoard = false;
 
+// Firebase Realtime Database reference
+const gameRef = firebase.ref(firebase.database, 'game');
+
 // Initialize the game
 function initGame() {
     board = createBoard();
@@ -18,6 +21,15 @@ function initGame() {
     currentPlayer = 1;
     updateScores();
     updateTurn();
+
+    // Sync game state with Firebase
+    firebase.set(gameRef, {
+        board: board,
+        flippedCards: flippedCards,
+        currentPlayer: currentPlayer,
+        playerScores: playerScores,
+        lockBoard: lockBoard
+    });
 }
 
 // Create the game board
@@ -63,6 +75,12 @@ function flipCard(index) {
     flippedCards.push(index);
     renderBoard();
 
+    // Update Firebase
+    firebase.update(gameRef, {
+        board: board,
+        flippedCards: flippedCards
+    });
+
     if (flippedCards.length === 2) {
         checkForMatch();
     }
@@ -83,6 +101,13 @@ function checkForMatch() {
             if (playerScores[1] + playerScores[2] === 8) {
                 endGame();
             }
+
+            // Update Firebase
+            firebase.update(gameRef, {
+                board: board,
+                flippedCards: flippedCards,
+                playerScores: playerScores
+            });
         }, 1000); // Wait 1 second before hiding matched cards
     } else {
         // Incorrect match
@@ -94,6 +119,14 @@ function checkForMatch() {
             renderBoard();
             lockBoard = false;
             switchPlayer();
+
+            // Update Firebase
+            firebase.update(gameRef, {
+                board: board,
+                flippedCards: flippedCards,
+                currentPlayer: currentPlayer,
+                lockBoard: lockBoard
+            });
         }, 1500); // Slow down flip for incorrect answers
     }
 }
@@ -131,6 +164,21 @@ function endGame() {
 
 // Reset the game
 resetButton.addEventListener('click', initGame);
+
+// Listen for real-time updates from Firebase
+firebase.onValue(gameRef, (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+        board = data.board;
+        flippedCards = data.flippedCards;
+        currentPlayer = data.currentPlayer;
+        playerScores = data.playerScores;
+        lockBoard = data.lockBoard;
+        renderBoard();
+        updateScores();
+        updateTurn();
+    }
+});
 
 // Start the game
 initGame();
